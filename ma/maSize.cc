@@ -60,6 +60,15 @@ void IdentitySizeField::getTransform(
              0,0,1);
 }
 
+void IdentitySizeField::getTransformAtVert(
+        Entity*,
+        Matrix& t)
+{
+  t = Matrix(1,0,0,
+             0,1,0,
+             0,0,1);
+}
+
 double IdentitySizeField::getWeight(Entity*)
 {
   return 1.0;
@@ -379,6 +388,21 @@ struct AnisoSizeField : public MetricSizeField
              0,0,1/h[2]);
     Q = R*S;
   }
+  void getTransformAtVert(
+      Entity* v,
+      Matrix& Q)
+  {
+    PCU_ALWAYS_ASSERT_VERBOSE(mesh->getType(v) == apf::Mesh::VERTEX,
+    	"expecting a mesh vertex!\n");
+    Vector h;
+    Matrix R;
+    apf::getVector(hField,v,0,h);
+    apf::getMatrix(rField,v,0,R);
+    Matrix S(1/h[0],0,0,
+             0,1/h[1],0,
+             0,0,1/h[2]);
+    Q = R*S;
+  }
   void interpolate(
       apf::MeshElement* parent,
       Vector const& xi,
@@ -468,6 +492,22 @@ struct LogAnisoSizeField : public MetricSizeField
     Matrix S( sqrt(exp(v[0])), 0, 0,
               0, sqrt(exp(v[1])), 0,
               0, 0, sqrt(exp(v[2])));
+    Q = R*S;
+  }
+  void getTransformAtVert(
+      Entity* v,
+      Matrix& Q)
+  {
+    PCU_ALWAYS_ASSERT_VERBOSE(mesh->getType(v) == apf::Mesh::VERTEX,
+    	"expecting a mesh vertex!\n");
+    Matrix logM;
+    apf::getMatrix(logMField,v,0,logM);
+    Vector u;
+    Matrix R;
+    orthogonalEigenDecompForSymmetricMatrix(logM, u, R);
+    Matrix S( sqrt(exp(u[0])), 0, 0,
+              0, sqrt(exp(u[1])), 0,
+              0, 0, sqrt(exp(u[2])));
     Q = R*S;
   }
   void interpolate(

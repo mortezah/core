@@ -35,6 +35,9 @@ class SizeField
         apf::MeshElement* e,
         Vector const& xi,
         Matrix& t) = 0;
+    virtual void getTransformAtVert(
+        Entity* v,
+        Matrix& t) = 0;
     virtual double getWeight(Entity* e) = 0;
 };
 
@@ -51,6 +54,9 @@ struct IdentitySizeField : public SizeField
   void getTransform(
           apf::MeshElement*,
           Vector const&,
+          Matrix& t);
+  void getTransformAtVert(
+          Entity*,
           Matrix& t);
   double getWeight(Entity*);
   Mesh* mesh;

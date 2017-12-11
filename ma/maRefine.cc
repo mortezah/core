@@ -126,6 +126,28 @@ Refine::~Refine()
   m->destroyTag(numberTag);
 }
 
+static double getXiOfMidPointInTransformedSpace(Refine* r, Entity* e)
+{
+  Adapt* a = r->adapt;
+  Mesh* m = a->mesh;
+  SizeField* sf = a->sizeField;
+
+  Entity* down[2];
+  m->getDownward(e, 0, down);
+
+  Matrix QA;
+  sf->getTransformAtVert(down[0], QA);
+  Matrix QB;
+  sf->getTransformAtVert(down[1], QB);
+
+  Vector delta = getPosition(m, down[1]) - getPosition(m, down[0]);
+
+  double lengthOf_QAr = (QA * delta).getLength();
+  double lengthOf_QBr = (QB * delta).getLength();
+
+  double t = 1. / (1 + std::sqrt(lengthOf_QAr/lengthOf_QBr));
+  return 2*t-1;
+}
 Entity* makeSplitVert(Refine* r, Entity* edge)
 {
   Adapt* a = r->adapt;
@@ -133,14 +155,15 @@ Entity* makeSplitVert(Refine* r, Entity* edge)
   Model* c = m->toModel(edge);
   SizeField* sf = a->sizeField;
   SolutionTransfer* st = a->solutionTransfer;
-/* midpoint of [-1,1] */
-  Vector xi(0,0,0);
+/* midpoint of edge in metric space */
+  double xi0 = getXiOfMidPointInTransformedSpace(r, edge);
+  Vector xi(xi0,0,0);
   apf::MeshElement* me = apf::createMeshElement(m,edge);
   Vector point;
   apf::mapLocalToGlobal(me,xi,point);
   Vector param(0,0,0); //prevents uninitialized values
   if (a->input->shouldTransferParametric)
-    transferParametricOnEdgeSplit(m,edge,0.5,param);
+    transferParametricOnEdgeSplit(m,edge,(xi0+1)/2,param);
   Entity* vert = buildVertex(a,c,point,param);
   st->onVertex(me,xi,vert);
   sf->interpolate(me,xi,vert);
