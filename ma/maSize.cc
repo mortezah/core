@@ -13,6 +13,7 @@
 #include <apfShape.h>
 #include <cstdlib>
 #include <pcu_util.h>
+#include <math.h>
 
 namespace ma {
 
@@ -186,10 +187,33 @@ class SizeFieldIntegrator : public apf::Integrator
     int dimension;
 };
 
+static double measureTransformedEdgeLength(Mesh* m, SizeField* sf, Entity* e)
+{
+  Entity* down[2];
+  m->getDownward(e, 0, down);
+
+  Matrix QA;
+  sf->getTransformAtVert(down[0], QA);
+  Matrix QB;
+  sf->getTransformAtVert(down[1], QB);
+
+  Vector delta = getPosition(m, down[1]) - getPosition(m, down[0]);
+  double L = delta.getLength();
+
+  double lengthOf_QA_delta = (QA * delta).getLength();
+  double lengthOf_QB_delta = (QB * delta).getLength();
+
+  double ha = L/lengthOf_QA_delta;
+  double hb = L/lengthOf_QB_delta;
+  return L * log(hb/ha)/(hb - ha);
+}
+
 struct MetricSizeField : public SizeField
 {
   double measure(Entity* e)
   {
+    if (mesh->getType(e) == apf::Mesh::EDGE)
+      return measureTransformedEdgeLength(mesh, this, e);
     SizeFieldIntegrator sFI(this); 
     apf::MeshElement* me = apf::createMeshElement(mesh, e);
     sFI.process(me);
