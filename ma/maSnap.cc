@@ -12,8 +12,10 @@
 #include "maAdapt.h"
 #include "maOperator.h"
 #include "maSnapper.h"
+#include "maMatchedSnapper.h"
 #include "maLayer.h"
 #include "maMatch.h"
+#include "maDBG.h"
 #include <apfGeometry.h>
 #include <pcu_util.h>
 #include <iostream>
@@ -558,6 +560,27 @@ void transferParametricOnEdgeSplit(
   ma::transferParametricBetween(m, g, ev, t, p);
 }
 
+void transferParametricOnTriSplit(
+    Mesh* m,
+    Entity* face,
+    const Vector& xi,
+    Vector& param)
+{
+  Model* g = m->toModel(face);
+  int modelDimension = m->getModelType(g);
+  if (m->getDimension() == 3 && modelDimension == 3) return;
+  Entity* tv[3];
+  m->getDownward(face, 0, tv);
+  Vector ep[3], pTemp;
+  for (int i = 0; i < 3; ++i) {
+    m->getParamOn(g, tv[i], ep[i]);
+  }
+  // TODO: Might be missing some cases here
+  for (int d = 0; d < modelDimension; ++d) {
+    param[d] = xi[0]*ep[0][d] + xi[1]*ep[1][d] + xi[2]*ep[2][d];
+  }
+}
+
 void transferParametricOnQuadSplit(
     Mesh* m,
     Entity* quad,
@@ -601,11 +624,12 @@ class SnapAll : public Operator
       if ( ! getFlag(adapter, e, SNAP))
         return false;
       vert = e;
+      snapper.setVert(e);
       return true;
     }
     bool requestLocality(apf::CavityOp* o)
     {
-      return snapper.setVert(vert, o);
+      return snapper.requestLocality(o);
     }
     void apply()
     {
@@ -624,6 +648,65 @@ class SnapAll : public Operator
     Snapper snapper;
 };
 
+bool snapAllVerts(Adapt* a, Tag* t, bool isSimple, long& successCount)
+{
+  SnapAll op(a, t, isSimple);
+  applyOperator(a, &op);
+  successCount += PCU_Add_Long(op.successCount);
+  return PCU_Or(op.didAnything);
+}
+
+class SnapMatched : public Operator
+{
+  public:
+    SnapMatched(Adapt* a, Tag* t, bool simple):
+      snapper(a, t, simple)
+    {
+      adapter = a;
+      tag = t;
+      successCount = 0;
+      didAnything = false;
+      vert = 0;
+    }
+    int getTargetDimension() {return 0;}
+    bool shouldApply(Entity* e)
+    {
+      if ( ! getFlag(adapter, e, SNAP))
+        return false;
+      vert = e;
+      snapper.setVert(e);
+      return true;
+    }
+    bool requestLocality(apf::CavityOp* o)
+    {
+      return snapper.requestLocality(o);
+    }
+    void apply()
+    {
+      snapper.setVerts();
+      bool snapped = snapper.trySnaps();
+      didAnything = didAnything || snapped;
+      if (snapped)
+        ++successCount;
+      clearFlagMatched(adapter, vert, SNAP);
+    }
+    int successCount;
+    bool didAnything;
+  private:
+    Adapt* adapter;
+    Tag* tag;
+    Entity* vert;
+    MatchedSnapper snapper;
+};
+
+bool snapMatchedVerts(Adapt* a, Tag* t, bool isSimple, long& successCount)
+{
+  SnapMatched op(a, t, isSimple);
+  applyOperator(a, &op);
+  successCount += PCU_Add_Long(op.successCount);
+  return PCU_Or(op.didAnything);
+}
+
 long tagVertsToSnap(Adapt* a, Tag*& t)
 {
   Mesh* m = a->mesh;
@@ -639,7 +722,7 @@ long tagVertsToSnap(Adapt* a, Tag*& t)
     Vector s;
     getSnapPoint(m, v, s);
     Vector x = getPosition(m, v);
-    if (apf::areClose(s, x, 0.0))
+    if (apf::areClose(s, x, 1e-12))
       continue;
     m->setDoubleTag(v, t, &s[0]);
     if (m->isOwned(v))
@@ -658,10 +741,10 @@ static void markVertsToSnap(Adapt* a, Tag* t)
 bool snapOneRound(Adapt* a, Tag* t, bool isSimple, long& successCount)
 {
   markVertsToSnap(a, t);
-  SnapAll op(a, t, isSimple);
-  applyOperator(a, &op);
-  successCount += PCU_Add_Long(op.successCount);
-  return PCU_Or(op.didAnything);
+  if (a->mesh->hasMatching())
+    return snapMatchedVerts(a, t, isSimple, successCount);
+  else
+    return snapAllVerts(a, t, isSimple, successCount);
 }
 
 long snapTaggedVerts(Adapt* a, Tag* tag)
