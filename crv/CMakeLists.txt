@@ -20,6 +20,7 @@ set(SOURCES
   crvTables.cc
   crvQuality.cc
   crvVtk.cc
+  crvEdgeReshape.cc
 )
 
 # Package headers
