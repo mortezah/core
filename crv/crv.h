@@ -119,6 +119,8 @@ ma::Input* configureShapeCorrection(
   note that this function will delete the Input object */
 void adapt(ma::Input* in);
 
+void curve(ma::Mesh* mesh, int order);
+
 /** \brief crv stats to get statistic information about the mesh
   \details statistic considered are (1)final/desired edge-lengths
   (2) linear quality (3) curved quality (minJ/maxJ)

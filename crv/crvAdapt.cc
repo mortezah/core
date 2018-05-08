@@ -7,6 +7,7 @@
 
 #include "crvAdapt.h"
 #include "crvShape.h"
+#include "crvCurveEntities.h"
 #include <apf.h>
 #include <apfMesh.h>
 #include <maBalance.h>
@@ -237,6 +238,29 @@ void adapt(ma::Input* in)
   delete a;
   delete in;
 }
+
+void curve(ma::Mesh* mesh, int order)
+{
+  if (order < 1 || order > 2) {
+    fail("trying to convert to unimplemented Bezier order\n");
+  }
+  apf::changeMeshShape(mesh, getBezier(order),true);
+
+  double t0 = PCU_Time();
+  ma::Input* in = ma::configureIdentity(mesh, 0);
+  Adapt* a = new Adapt(in);
+  CurveEdge ce(a);
+  ma::applyOperator(a, &ce);
+  ma::applyOperator(a, &ce);
+  ma::applyOperator(a, &ce);
+  double t1 = PCU_Time();
+  ma::print("mesh adapted in %f seconds",t1-t0);
+  apf::printStats(a->mesh);
+  crv::clearTags(a);
+  delete a;
+  delete in;
+}
+
 
 /** \brief Measures entity related quantities for a given mesh
   \details  quantities include normalized edge length, linear quality

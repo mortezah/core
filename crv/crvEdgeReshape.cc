@@ -77,21 +77,24 @@ static int markEdges(ma::Mesh* m, ma::Entity* e, int tag,
 
 
 
-void EdgeReshape::Init(Adapt* a, int t)
+void EdgeReshape::Init(Adapt* a, int t, ma::Vector d)
 {
   adapter = a;
   mesh = a->mesh;
   tag = t;
   simplex = 0;
   edges[0] = edges[1] = edges[2] = edges[3] = edges[4] = edges[5] = 0;
+  refEdge = 0;
   ne = 0;
   oldPositions.clear();
+  dir = d;
 }
 
-void EdgeReshape::setSimplex(ma::Entity* e)
+void EdgeReshape::setSimplex(ma::Entity* s, ma::Entity* e)
 {
-  ne = markEdges(mesh,e,tag,edges);
-  simplex = e;
+  ne = markEdges(mesh,s,tag,edges);
+  simplex = s;
+  refEdge = e;
   for (int i = 0; i < ne; i++) {
     ma::Vector pos;
     mesh->getPoint(edges[i],0,pos);
@@ -99,15 +102,61 @@ void EdgeReshape::setSimplex(ma::Entity* e)
   }
 }
 
+static bool shareVert(ma::Mesh* m, ma::Entity* e1, ma::Entity* e2)
+{
+  ma::Entity* vs1[2];
+  ma::Entity* vs2[2];
+  m->getDownward(e1, 0, vs1);
+  m->getDownward(e2, 0, vs2);
+
+  return (vs1[0] == vs2[0]) ||
+	 (vs1[0] == vs2[1]) ||
+	 (vs1[1] == vs2[0]) ||
+	 (vs1[1] == vs2[1]);
+}
+
+ma::Entity* EdgeReshape::findCandidateEdge()
+{
+  ma::Entity* edge = 0;
+  double maxCosineAngle = -1.0;
+  printf("ne is %d tag is %d\n", ne, tag);
+  for (int i = 0; i < ne; i++) {
+    if (isBoundaryEntity(mesh, edges[i])) {
+      printf("boundary edge\n");
+      continue;
+    }
+    if (!shareVert(mesh, edges[i], refEdge)) {
+      printf("edges don't share a vertex\n");
+      continue;
+    }
+    /* if (refEdge == edges[i]) continue; */
+    double cosineAngle = apf::computeCosAngleInTet(mesh, simplex, refEdge, edges[i],
+    	ma::Matrix(1.,0.,0.,0.,1.,0.,0.,0.,1.));
+    printf("cos angle is %f \n", cosineAngle);
+    if (cosineAngle > maxCosineAngle) {
+      maxCosineAngle = cosineAngle;
+      edge = edges[i];
+    }
+  }
+  printf("=========\n");
+  /* PCU_ALWAYS_ASSERT(edge); */
+  return edge;
+}
+
 bool EdgeReshape::reshape()
 {
-  for (int i = 0; i < ne; i++) {
-    if (isBoundaryEntity(mesh, edges[i])) continue;
-    rePosition(edges[i]);
-    if (isValid(edges[i]))
-    	return true;
+  ma::Entity* edgeToTry = findCandidateEdge();
+  if (!edgeToTry)
+    return false;
+  rePosition(edgeToTry);
+  if (isValid(edgeToTry)) {
+    printf("++++ edge reshape was successful ++++\n");
+    return true;
   }
-  return false;
+  else {
+    printf("++++ edge reshape wasn't successful ++++\n");
+    return false;
+  }
 }
 
 void EdgeReshape::rePosition(ma::Entity* edge)
@@ -177,16 +226,34 @@ void EdgeReshape::rePosition(ma::Entity* edge)
   if(validity > 1e-10)
     return;
 
+  normal = normal/length;
+
   /* mirror the vector edgeVectors[edgeIndex] with respect to the plane
     * perpendicular to the normal. The parameter alpha scales the normal
     * (to the plane) component of the mirrored vector.
     */
-  double alpha = 0.95;
+  /* normal = ma::Vector(0,0,0) - dir; */
+  /* normal = dir; */
+  double alpha = 1.5;
+  double delta = dir.getLength()/100;
+  int n = 65;
 
-  ma::Vector newPoint = pivotPoint + edgeVectors[edgeIndex] -
-    normal * (normal * edgeVectors[edgeIndex]) * (1 + alpha) / length / length;
+  for (int i = 0; i < 150; i++) {
+    ma::Vector newPoint = pivotPoint + edgeVectors[edgeIndex] +
+      dir * i * delta / dir.getLength();
+    mesh->setPoint(edge,0,newPoint);
+    if (isValid(edge)) {
+      printf("++++ found a valid reshape ++++\n");
+      break;
+    }
+  }
+  /* ma::Vector newPoint = pivotPoint + edgeVectors[edgeIndex] + */
+  /*   dir * (1+alpha) * std::abs(edgeVectors[edgeIndex]*normal) * std::abs(dir*normal); */
 
-  mesh->setPoint(edge,0,newPoint);
+  /* ma::Vector newPoint = pivotPoint + edgeVectors[edgeIndex] - */
+  /*   normal * (normal * edgeVectors[edgeIndex]) * (1 + alpha) / length / length; */
+
+  /* mesh->setPoint(edge,0,newPoint); */
 
 }
 

@@ -19,8 +19,9 @@ class Adapt;
 class EdgeReshape
 {
   public:
-    void Init(Adapt* a, int t);
-    void setSimplex(ma::Entity* e);
+    void Init(Adapt* a, int t, ma::Vector d);
+    void setSimplex(ma::Entity* s, ma::Entity* e);
+    ma::Entity* findCandidateEdge();
     bool reshape();
     void rePosition(ma::Entity* edge);
     bool isValid(ma::Entity* edge);
@@ -30,9 +31,10 @@ class EdgeReshape
     ma::Mesh* mesh;
     ma::Entity* simplex;
     ma::Entity* edges[6];
-    ma::Entity* candidateEdge;
+    ma::Entity* refEdge;
     int ne;
     std::vector<ma::Vector> oldPositions;
+    ma::Vector dir;
 };
 
 }

@@ -209,6 +209,11 @@ public:
       return;
     }
 
+    ma::Vector currentPos;
+    mesh->getPoint(edge, 0, currentPos);
+    ma::Vector dir = currentPos - oldPositions[0];
+    /* dir = dir / dir.getLength(); */
+
     // at this point there is an invalid element in the cavity
     // find it and operate on it if possible
     for (std::size_t i = 0; i < adj.getSize(); ++i){
@@ -216,31 +221,35 @@ public:
       /* int nc = markEdges(mesh, adj[i], qualityTag, edges); */
       if (qualityTag < 2) continue;
       EdgeReshape er;
-      er.Init(adapter, qualityTag);
-      er.setSimplex(adj[i]);
+      er.Init(adapter, qualityTag, dir);
+      er.setSimplex(adj[i], edge);
       if (er.reshape()) {
       	// check the outer cavity
-      	bool isCavityValid = true;
+      	bool cavityValid = true;
       	int invalidCount = 0;
       	for (std::size_t j = 0; j < adj.getSize(); ++j){
       	  /* int v = qual->checkValidity(adj[j]); */
       	  /* if (v >= 2) { */
       	  double v = qual->getQuality(adj[j]);
       	  if (v < 0) {
-      	    isCavityValid = false;
+      	    cavityValid = false;
       	    invalidCount++;
+      	    printf("+++++ v is %f\n",v);
       	    /* break; */
 	  }
 	}
-	if (isCavityValid) {
+	if (cavityValid) {
+	  printf("+++++ cavity is valid ++++++ \n");
 	  ns++;
 	  return;
 	}
 	else {
+	  /* printf("++++ here 01 ++++\n"); */
 	  er.cancel();
 	}
       }
       else {
+	/* printf("++++ here 02 ++++\n"); */
       	er.cancel();
       }
     }
@@ -251,6 +260,7 @@ public:
       ma::Vector pos = oldPositions[i];
       mesh->setPoint(edge, i, pos);
     }
+
   }
 private:
   Adapt* adapter;
