@@ -12,6 +12,7 @@
   * \brief main file for curving edges and faces */
 
 #include<maOperator.h>
+#include<maSnap.h>
 #include"crvSnap.h"
 #include"crvShape.h"
 #include"crvBezier.h"
@@ -69,9 +70,9 @@ static void snapToInterpolate2(apf::Mesh2* m, apf::MeshEntity* e)
     apf::ModelEntity* g = m->toModel(e);
     fs->getNodeXi(type,i,xi);
     if(type == apf::Mesh::EDGE)
-      transferParametricOnEdgeSplit(m,e,0.5*(xi[0]+1.),p);
+      ma::transferToClosestPointOnEdgeSplit(m,e,0.5*(xi[0]+1.),p);
     else
-      transferParametricOnTriSplit(m,e,xi,p);
+      ma::transferToClosestPointOnTriSplit(m,e,xi,p);
     m->snapToModel(g,p,pt);
     m->setPoint(e,i,pt);
   }
