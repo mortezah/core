@@ -21,6 +21,7 @@ set(SOURCES
   crvQuality.cc
   crvVtk.cc
   crvEdgeReshape.cc
+  crvVertexMove.cc
 )
 
 # Package headers
