@@ -17,6 +17,7 @@
 #include"crvShape.h"
 #include"crvBezier.h"
 #include"crvEdgeReshape.h"
+#include"crvVertexMove.h"
 
 namespace crv {
 
@@ -71,8 +72,10 @@ static void snapToInterpolate2(apf::Mesh2* m, apf::MeshEntity* e)
     fs->getNodeXi(type,i,xi);
     if(type == apf::Mesh::EDGE)
       ma::transferToClosestPointOnEdgeSplit(m,e,0.5*(xi[0]+1.),p);
+      /* ma::transferParametricOnEdgeSplit(m,e,0.5*(xi[0]+1.),p); */
     else
       ma::transferToClosestPointOnTriSplit(m,e,xi,p);
+      /* ma::transferParametricOnTriSplit(m,e,xi,p); */
     m->snapToModel(g,p,pt);
     m->setPoint(e,i,pt);
   }
@@ -139,6 +142,17 @@ static void snapToInterpolate2(apf::Mesh2* m, apf::MeshEntity* e)
 /*   return n; */
 /* } */
 
+static bool isCavityValid(Quality* qual, apf::Adjacent adj)
+{
+  bool valid = true;
+  for (std::size_t i = 0; i < adj.getSize(); ++i)
+    if (qual->getQuality(adj[i]) < 0){
+      valid = false;
+      break;
+    }
+  return valid;
+}
+
 class CurveEdge : public ma::Operator
 {
 public:
@@ -192,76 +206,68 @@ public:
     // check the validity here
     apf::Adjacent adj;
     mesh->getAdjacent(edge, 3, adj);
-
-    bool isCavityValid = true;
-    int invalidCount = 0;
-    for (std::size_t i = 0; i < adj.getSize(); ++i){
-      if (qual->getQuality(adj[i]) < 0){
-      	isCavityValid = false;
-      	invalidCount++;
-      	/* break; */
-      }
-    }
-
-
-    // if cavity is ok then return
-    if (isCavityValid) {
+    if (isCavityValid(qual, adj)) {
       ns++;
       return;
     }
 
+    // get the displacement vector
     ma::Vector currentPos;
     mesh->getPoint(edge, 0, currentPos);
     ma::Vector dir = currentPos - oldPositions[0];
-    /* dir = dir / dir.getLength(); */
 
     // at this point there is an invalid element in the cavity
     // find it and operate on it if possible
     for (std::size_t i = 0; i < adj.getSize(); ++i){
       int qualityTag = qual->checkValidity(adj[i]);
-      /* int nc = markEdges(mesh, adj[i], qualityTag, edges); */
       if (qualityTag < 2) continue;
+
+      // first try edge reshaping
       EdgeReshape er;
       er.Init(adapter, qualityTag, dir);
       er.setSimplex(adj[i], edge);
       if (er.reshape()) {
-      	// check the outer cavity
-      	bool cavityValid = true;
-      	int invalidCount = 0;
-      	for (std::size_t j = 0; j < adj.getSize(); ++j){
-      	  /* int v = qual->checkValidity(adj[j]); */
-      	  /* if (v >= 2) { */
-      	  double v = qual->getQuality(adj[j]);
-      	  if (v < 0) {
-      	    cavityValid = false;
-      	    invalidCount++;
-      	    printf("+++++ v is %f\n",v);
-      	    /* break; */
-	  }
-	}
-	if (cavityValid) {
-	  printf("+++++ cavity is valid ++++++ \n");
+      	if (isCavityValid(qual, adj)) {
 	  ns++;
 	  return;
 	}
 	else {
-	  /* printf("++++ here 01 ++++\n"); */
-	  er.cancel();
+	  printf("++++ here 01 ++++\n");
+	  /* er.cancel(); */
 	}
       }
       else {
-	/* printf("++++ here 02 ++++\n"); */
+	printf("++++ here 02 ++++\n");
       	er.cancel();
+      }
+
+      // second try vertex moving
+      VertexMove vm;
+      vm.Init(adapter, qualityTag, dir);
+      if (!vm.setSimplex(adj[i], edge))
+      	continue;
+      if (vm.move()) {
+	if (isCavityValid(qual, adj)) {
+	  ns++;
+	  return;
+	}
+	else {
+	  printf("++++ here 01 ++++\n");
+	  vm.cancel();
+	}
+      }
+      else {
+      	vm.cancel();
       }
     }
 
-
-    nf++;
-    for (int i = 0; i < nn; i++) {
-      ma::Vector pos = oldPositions[i];
-      mesh->setPoint(edge, i, pos);
-    }
-
+    // at this point all the operations were unsuccessful
+    // revert the outer cavity back to its original state
+    /* nf++; */
+    /* for (int i = 0; i < nn; i++) { */
+    /*   ma::Vector pos = oldPositions[i]; */
+    /*   mesh->setPoint(edge, i, pos); */
+    /* } */
   }
 private:
   Adapt* adapter;

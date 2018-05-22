@@ -119,26 +119,25 @@ ma::Entity* EdgeReshape::findCandidateEdge()
 {
   ma::Entity* edge = 0;
   double maxCosineAngle = -1.0;
-  printf("ne is %d tag is %d\n", ne, tag);
+  printf("2222 ne is %d tag is %d\n", ne, tag);
   for (int i = 0; i < ne; i++) {
     if (isBoundaryEntity(mesh, edges[i])) {
-      printf("boundary edge\n");
+      printf("2222 boundary edge, skipping\n");
       continue;
     }
     if (!shareVert(mesh, edges[i], refEdge)) {
-      printf("edges don't share a vertex\n");
+      printf("2222 edges don't share a vertex\n");
       continue;
     }
     /* if (refEdge == edges[i]) continue; */
     double cosineAngle = apf::computeCosAngleInTet(mesh, simplex, refEdge, edges[i],
     	ma::Matrix(1.,0.,0.,0.,1.,0.,0.,0.,1.));
-    printf("cos angle is %f \n", cosineAngle);
+    printf("2222 cos angle is %f \n", cosineAngle);
     if (cosineAngle > maxCosineAngle) {
       maxCosineAngle = cosineAngle;
       edge = edges[i];
     }
   }
-  printf("=========\n");
   /* PCU_ALWAYS_ASSERT(edge); */
   return edge;
 }
@@ -146,15 +145,14 @@ ma::Entity* EdgeReshape::findCandidateEdge()
 bool EdgeReshape::reshape()
 {
   ma::Entity* edgeToTry = findCandidateEdge();
-  if (!edgeToTry)
-    return false;
+  if (!edgeToTry) return false;
   rePosition(edgeToTry);
   if (isValid(edgeToTry)) {
-    printf("++++ edge reshape was successful ++++\n");
+    printf("2222 edge reshape was successful ++++\n");
     return true;
   }
   else {
-    printf("++++ edge reshape wasn't successful ++++\n");
+    printf("2222 edge reshape wasn't successful ++++\n");
     return false;
   }
 }
@@ -243,7 +241,7 @@ void EdgeReshape::rePosition(ma::Entity* edge)
       dir * i * delta / dir.getLength();
     mesh->setPoint(edge,0,newPoint);
     if (isValid(edge)) {
-      printf("++++ found a valid reshape ++++\n");
+      printf("2222 found a valid reshape ++++\n");
       break;
     }
   }
