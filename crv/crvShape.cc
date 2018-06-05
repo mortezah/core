@@ -12,6 +12,7 @@
 #include "crvTables.h"
 #include "crvShapeFixer.h"
 #include <maCoarsen.h>
+#include <maRegionCollapse.h>
 #include <maEdgeSwap.h>
 #include <maOperator.h>
 #include <maShapeHandler.h>
@@ -314,6 +315,48 @@ public:
   int nr;
 };
 
+class RegionCollapser : public ma::Operator
+{
+  public:
+    RegionCollapser(Adapt* a, double flatAngle):
+      adapt(a)
+    {
+      rcollapse.Init(a, flatAngle);
+      ns = 0;
+    }
+    virtual int getTargetDimension() {return 3;}
+    virtual bool shouldApply(ma::Entity* e)
+    {
+      if ( ! getFlag(adapt,e,ma::COLLAPSE))
+        return false;
+      ma::Mesh* m = adapt->mesh;
+      bool ok = rcollapse.setRegion(e);
+      PCU_ALWAYS_ASSERT(ok);
+      return true;
+    }
+    virtual bool requestLocality(apf::CavityOp* o)
+    {
+      return rcollapse.requestLocality(o);
+    }
+    virtual void apply()
+    {
+      if ( ! rcollapse.checkTopo()) {
+      	rcollapse.unmark();
+        return;
+      }
+      if ( ! rcollapse.checkGeom()) {
+      	rcollapse.unmark();
+        return;
+      }
+      rcollapse.apply();
+      ++ns;
+    }
+    Adapt* adapt;
+    int ns;
+  private:
+    ma::RegionCollapse rcollapse;
+};
+
 static bool isCornerTriAngleLargeMetric(crv::Adapt *a,
     ma::Entity* tri, int index)
 {
@@ -592,13 +635,55 @@ int fixInvalidEdges(Adapt* a)
     return 0;
   }
 
-  if(a->mesh->getShape()->getOrder() == 2)
-    repositionInvalidEdges(a);
+  /* if(a->mesh->getShape()->getOrder() == 2) */
+  /*   repositionInvalidEdges(a); */
   collapseInvalidEdges(a);
   swapInvalidEdges(a);
   return count;
 }
 
+static int markRegionsToCollapse(Adapt* a, int flag)
+{
+  int invalid = markInvalidEntities(a);
+  if ( !invalid )
+    return 0;
+  int count = 0;
+
+  ma::Mesh* m = a->mesh;
+  ma::Entity* e;
+
+  ma::Iterator* it = m->begin(m->getDimension());
+  while ((e = m->iterate(it)))
+  {
+    int tag = crv::getTag(a,e);
+    if (tag >= 2 && !ma::getFlag(a, e, flag)) {
+      ma::setFlag(a, e, flag);
+      if (a->mesh->isOwned(e))
+      	count++;
+    }
+  }
+  m->end(it);
+
+  return PCU_Add_Long(count);
+
+}
+
+static void collapseInvalidRegions(Adapt* a)
+{
+  double t0 = PCU_Time();
+  RegionCollapser rc(a, 60);
+  ma::applyOperator(a,&rc);
+  double t1 = PCU_Time();
+  ma::print("collapsed %d bad regions "
+      "in %f seconds",rc.ns, t1-t0);
+}
+
+int fixInvalidRegions(Adapt* a)
+{
+  int count = markRegionsToCollapse(a, ma::COLLAPSE);
+  collapseInvalidRegions(a);
+  return count;
+}
 
 struct IsBadCrvQuality : public ma::Predicate
 {

@@ -265,7 +265,7 @@ static void processNewBdryVert(Mesh* m, Entity* v)
   m->getClosestPoint(c, coords, newCoords, newParams);
   m->setParam(v, newParams);
   // TODO: this must be done via snapping
-  /* m->setPoint(v, 0, newCoords); */
+  m->setPoint(v, 0, newCoords);
 }
 
 void RegionCollapse::apply()

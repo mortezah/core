@@ -59,6 +59,10 @@ int fixLargeBoundaryAngles(Adapt* a);
     try and collapse or swap it away */
 int fixInvalidEdges(Adapt* a);
 
+/** \brief If a region is flagged as invalid,
+    try a region collapse */
+int fixInvalidRegions(Adapt* a);
+
 /** \brief attempts to fix the shape of the
     elements in a same manner as ma::fixElementShape */
 void fixCrvElementShapes(Adapt* a);

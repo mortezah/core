@@ -165,7 +165,8 @@ ma::Input* configureShapeCorrection(
 static int fixInvalidElements(crv::Adapt* a)
 {
   a->input->shouldForceAdaptation = true;
-  int count = crv::fixLargeBoundaryAngles(a)
+  int count = crv::fixInvalidRegions(a);
+	    + crv::fixLargeBoundaryAngles(a)
             + crv::fixInvalidEdges(a);
   int originalCount = count;
   int prev_count;
@@ -251,7 +252,7 @@ void curve(ma::Mesh* mesh, int order)
   Adapt* a = new Adapt(in);
   CurveEdge ce(a);
   ma::applyOperator(a, &ce);
-  ma::applyOperator(a, &ce);
+  fixInvalidElements(a);
   ma::applyOperator(a, &ce);
   double t1 = PCU_Time();
   ma::print("mesh adapted in %f seconds",t1-t0);

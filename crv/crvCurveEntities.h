@@ -242,23 +242,23 @@ public:
       }
 
       // second try vertex moving
-      VertexMove vm;
-      vm.Init(adapter, qualityTag, dir);
-      if (!vm.setSimplex(adj[i], edge))
-      	continue;
-      if (vm.move()) {
-	if (isCavityValid(qual, adj)) {
-	  ns++;
-	  return;
-	}
-	else {
-	  printf("++++ here 01 ++++\n");
-	  vm.cancel();
-	}
-      }
-      else {
-      	vm.cancel();
-      }
+      /* VertexMove vm; */
+      /* vm.Init(adapter, qualityTag, dir); */
+      /* if (!vm.setSimplex(adj[i], edge)) */
+      /* 	continue; */
+      /* if (vm.move()) { */
+	/* if (isCavityValid(qual, adj)) { */
+	  /* ns++; */
+	  /* return; */
+	/* } */
+	/* else { */
+	  /* printf("++++ here 01 ++++\n"); */
+	  /* vm.cancel(); */
+	/* } */
+      /* } */
+      /* else { */
+      /* 	vm.cancel(); */
+      /* } */
     }
 
     // at this point all the operations were unsuccessful
