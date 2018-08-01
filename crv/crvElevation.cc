@@ -47,7 +47,7 @@ void changeMeshOrder(apf::Mesh2* m, int newOrder)
   // as such, the bezier shape class can only be one order at a time
   // to make things happy, we switch back and forth depending on
   // whether we are elevating elements or snapping to boundary
-  setOrder(oldOrder);
+  setOrder(newOrder);
   bool canSnap = m->canSnap();
 
   // do the boundaries first for the new field, this is tricky,
