@@ -16,6 +16,7 @@ set(SOURCES
   crvShapeFixer.cc
   crvShapeHandler.cc
   crvSnap.cc
+  crvEdgeReshapeHO.cc
   crvSubdivision.cc
   crvTables.cc
   crvQuality.cc
