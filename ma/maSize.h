@@ -73,11 +73,13 @@ class AnisotropicFunction
 {
   public:
     virtual ~AnisotropicFunction();
-    /** \brief get the size field value at this vertex
+    /** \brief get the size field value at the given node of an entity
       \param r the orthonormal basis frame
       \param h the desired element sizes along each
                of the frame's basis vectors */
-    virtual void getValue(Entity* vert, Matrix& r, Vector& h) = 0;
+    virtual void getValue(Entity* ent, int node, Matrix& r, Vector& h) = 0;
+    /** \brief return the number of nodes associated with entity */
+    virtual int nodeCount(Entity* ent) = 0;
 };
 
 /** \brief User-defined Isotropic size function */
@@ -85,16 +87,19 @@ class IsotropicFunction
 {
   public:
     virtual ~IsotropicFunction();
-    /** \brief get the desired element size at this vertex */
-    virtual double getValue(Entity* vert) = 0;
+    /** \brief get the desired element size at entities node */
+    virtual double getValue(Entity* ent, int node) = 0;
+    /** \brief return the number of nodes associated with entity */
+    virtual int nodeCount(Entity* ent) = 0;
 };
 
 SizeField* makeSizeField(Mesh* m, apf::Field* sizes, apf::Field* frames,
     bool logInterpolation = false);
 SizeField* makeSizeField(Mesh* m, AnisotropicFunction* f,
+    int order = 1,
     bool logInterpolation = false);
 SizeField* makeSizeField(Mesh* m, apf::Field* size);
-SizeField* makeSizeField(Mesh* m, IsotropicFunction* f);
+SizeField* makeSizeField(Mesh* m, IsotropicFunction* f, int order = 1);
 
 double getAverageEdgeLength(Mesh* m);
 double getMaximumEdgeLength(Mesh* m, SizeField* sf = 0);
