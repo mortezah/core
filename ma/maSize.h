@@ -27,10 +27,11 @@ class SizeField
     virtual double measure(Entity* e) = 0;
     virtual bool shouldSplit(Entity* edge) = 0;
     virtual bool shouldCollapse(Entity* edge) = 0;
+    // default is for new verts but can also be used for higher order nodes
     virtual void interpolate(
         apf::MeshElement* parent,
         Vector const& xi,
-        Entity* newVert) = 0;
+        Entity* ent, int node = 0) = 0;
     virtual void getTransform(
         apf::MeshElement* e,
         Vector const& xi,
@@ -47,7 +48,7 @@ struct IdentitySizeField : public SizeField
   void interpolate(
       apf::MeshElement* parent,
       Vector const& xi,
-      Entity* newVert);
+      Entity* ent, int node);
   void getTransform(
           apf::MeshElement*,
           Vector const&,
@@ -73,13 +74,11 @@ class AnisotropicFunction
 {
   public:
     virtual ~AnisotropicFunction();
-    /** \brief get the size field value at the given node of an entity
+    /** \brief get the size field value at a given physical coordinate
       \param r the orthonormal basis frame
       \param h the desired element sizes along each
                of the frame's basis vectors */
-    virtual void getValue(Entity* ent, int node, Matrix& r, Vector& h) = 0;
-    /** \brief return the number of nodes associated with entity */
-    virtual int nodeCount(Entity* ent) = 0;
+    virtual void getValue(const Vector& x, Matrix& r, Vector& h) = 0;
 };
 
 /** \brief User-defined Isotropic size function */
@@ -87,19 +86,16 @@ class IsotropicFunction
 {
   public:
     virtual ~IsotropicFunction();
-    /** \brief get the desired element size at entities node */
-    virtual double getValue(Entity* ent, int node) = 0;
-    /** \brief return the number of nodes associated with entity */
-    virtual int nodeCount(Entity* ent) = 0;
+    /** \brief get the desired element size at a given physical coordinate */
+    virtual double getValue(const Vector& x) = 0;
 };
 
 SizeField* makeSizeField(Mesh* m, apf::Field* sizes, apf::Field* frames,
     bool logInterpolation = false);
 SizeField* makeSizeField(Mesh* m, AnisotropicFunction* f,
-    int order = 1,
     bool logInterpolation = false);
 SizeField* makeSizeField(Mesh* m, apf::Field* size);
-SizeField* makeSizeField(Mesh* m, IsotropicFunction* f, int order = 1);
+SizeField* makeSizeField(Mesh* m, IsotropicFunction* f);
 
 double getAverageEdgeLength(Mesh* m);
 double getMaximumEdgeLength(Mesh* m, SizeField* sf = 0);
