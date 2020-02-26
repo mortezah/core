@@ -16,71 +16,69 @@
 #include <cstdlib>
 #include <iostream>
 
-class AnisotropicX: public ma::AnisotropicFunction {
-  public:
-    AnisotropicX(ma::Mesh* mesh, int splitDir) {
-      m = mesh;
-      dir = splitDir;
-      PCU_ALWAYS_ASSERT(dir>=0 && dir<3);
-      isf = new ma::IdentitySizeField(m);
-      fLen = createFieldOn(m, "incidentEdgeLength", apf::SCALAR);
-      fCnt = createFieldOn(m, "incidentEdgeCount", apf::SCALAR);
-      getVtxSize();
+static void getEdgeLenAndCnt(
+    ma::Mesh* m,
+    ma::Entity* v,
+    ma::SizeField* isf,
+    double& len, int& cnt){
+  len = 0;
+  cnt = 0;
+  apf::Up edges;
+  m->getUp(v, edges);
+  for(int eIdx=0; eIdx < edges.n; eIdx++) {
+    if( m->isOwned(edges.e[eIdx])) {
+      cnt++;
+      len += isf->measure(edges.e[eIdx]);
     }
-    ~AnisotropicX() {
-      apf::destroyField(fLen);
-      apf::destroyField(fCnt);
-      delete isf;
-    }
-    void getValue(ma::Entity* v, ma::Matrix& r, ma::Vector& h) {
-      r = ma::Matrix(1,0,0,
-                     0,1,0,
-                     0,0,1);
-      int cnt = static_cast<int>(apf::getScalar(fCnt, v, 0));
-      double l = apf::getScalar(fLen, v, 0) / cnt;
-      const double f = 1.8;
-      double sz[3] = {l,l,l};
-      for(int i=0; i<3; i++) 
-        if( i == dir ) 
-          sz[i] /= f;
-      h = ma::Vector(sz);
-    }
-  private:
-    ma::Mesh* m;
-    int dir;
-    ma::SizeField* isf;
-    apf::Field* fLen;
-    apf::Field* fCnt;
+  }
+}
 
-    void getVtxSize() {
-      double len;
-      int cnt;
-      ma::Entity* vtx;
-      apf::MeshIterator* itr = m->begin(0);
-      while( (vtx = m->iterate(itr)) ) {
-        getEdgeLenAndCnt(vtx, len, cnt);
-        apf::setScalar(fLen, vtx, 0, len);
-        apf::setScalar(fCnt, vtx, 0, cnt);
-      }
-      m->end(itr);
-      apf::accumulate(fLen);
-      apf::accumulate(fCnt);
-      apf::synchronize(fLen);
-      apf::synchronize(fCnt);
-    }
-    void getEdgeLenAndCnt(ma::Entity* v, double& len, int& cnt) {
-      len = 0;
-      cnt = 0;
-      apf::Up edges;
-      m->getUp(v, edges);
-      for(int eIdx=0; eIdx < edges.n; eIdx++) {
-        if( m->isOwned(edges.e[eIdx])) {
-          cnt++;
-          len += isf->measure(edges.e[eIdx]);
-        }
-      }
-    }
-};
+static void getAnisoSizeX(
+    ma::Mesh* m,
+    int dir,
+    apf::Field* sizes,
+    apf::Field* frames)
+{
+  PCU_ALWAYS_ASSERT(dir>=0 && dir<3);
+  PCU_ALWAYS_ASSERT(apf::getValueType(sizes) == apf::VECTOR);
+  PCU_ALWAYS_ASSERT(apf::getValueType(frames) == apf::MATRIX);
+  ma::SizeField* isf = new ma::IdentitySizeField(m);
+  apf::Field* fLen = createFieldOn(m, "incidentEdgeLength", apf::SCALAR);
+  apf::Field* fCnt = createFieldOn(m, "incidentEdgeCount", apf::SCALAR);
+  double len;
+  int cnt;
+  ma::Entity* vtx;
+  apf::MeshIterator* itr = m->begin(0);
+  while( (vtx = m->iterate(itr)) ) {
+    getEdgeLenAndCnt(m, vtx, isf, len, cnt);
+    apf::setScalar(fLen, vtx, 0, len);
+    apf::setScalar(fCnt, vtx, 0, cnt);
+  }
+  m->end(itr);
+  apf::accumulate(fLen);
+  apf::accumulate(fCnt);
+  apf::synchronize(fLen);
+  apf::synchronize(fCnt);
+
+  itr = m->begin(0);
+  while( (vtx = m->iterate(itr)) ) {
+    int cnt = static_cast<int>(apf::getScalar(fCnt, vtx, 0));
+    double l = apf::getScalar(fLen, vtx, 0) / cnt;
+    const double f = 1.8;
+    double sz[3] = {l,l,l};
+    for(int i=0; i<3; i++)
+      if( i == dir )
+	sz[i] /= f;
+
+    apf::setVector(sizes, vtx, 0, ma::Vector(sz));
+    apf::setMatrix(frames, vtx, 0,
+    	ma::Matrix(1.,0.,0.,0.,1.,0.,0.,0.,1.));
+  }
+  apf::destroyField(fLen);
+  apf::destroyField(fCnt);
+  delete isf;
+}
+
 
 int main(int argc, char** argv)
 {
@@ -102,8 +100,10 @@ int main(int argc, char** argv)
 #endif
   gmi_register_mesh();
   ma::Mesh* m = apf::loadMdsMesh(argv[1],argv[2]);
-  AnisotropicX* ansx = new AnisotropicX(m, atoi(argv[3]));
-  ma::Input* in = ma::configure(m, ansx);
+  apf::Field* sizes = createFieldOn(m, "sizes", apf::VECTOR);
+  apf::Field* frames = createFieldOn(m, "frames", apf::MATRIX);
+  getAnisoSizeX(m, atoi(argv[3]) ,sizes, frames);
+  ma::Input* in = ma::configure(m, sizes, frames);
   in->shouldRunPreZoltanRib = true;
   in->shouldRunPreParma = true;
   in->shouldRunMidParma = true;
@@ -116,7 +116,9 @@ int main(int argc, char** argv)
   in->shouldFixShape = false;
   ma::adapt(in);
   m->verify();
-  delete ansx;
+  /* delete ansx; */
+  apf::destroyField(sizes);
+  apf::destroyField(frames);
   m->writeNative(argv[4]);
   m->destroyNative();
   apf::destroyMesh(m);
