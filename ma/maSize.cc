@@ -711,13 +711,16 @@ struct IsoSizeField : public MetricSizeField
     sField = sizes;
   }
   void getTransform(
-      apf::MeshElement*,
-      Vector const&,
+      apf::MeshElement* me,
+      Vector const& xi,
       Matrix& Q)
   {
-    Q = Matrix(1.,0.,0.,
-               0.,1.,0.,
-               0.,0.,1.);
+    apf::Element* el = apf::createElement(sField,me);
+    double h = apf::getScalar(el,xi);
+    Q = Matrix(1./h, 0.  , 0.,
+               0.,   1./h, 0.,
+               0.,   0.  , 1./h);
+    apf::destroyElement(el);
   }
   void interpolate(
       apf::MeshElement* parent,
@@ -742,110 +745,6 @@ struct IsoSizeField : public MetricSizeField
   IsoEval isoEval;
   apf::Field* sField;
 };
-
-/* struct IsoSizeField : public AnisoSizeField */
-/* { */
-/*   IsoSizeField() */
-/*   { */
-/*   } */
-/*   IsoSizeField(Mesh* m, IsotropicFunction* f): */
-/*     AnisoSizeField(m, &wrapper), */
-/*     wrapper(f) */
-/*   { */
-/*     s = hField; // from the AnisoSizeField class */
-/*     valueType = apf::VECTOR; */
-/*   } */
-/*   ~IsoSizeField() */
-/*   { */
-/*     apf::destroyField(s); */
-/*   } */
-/*   void init(Mesh* m, apf::Field* sizes) */
-/*   { */
-/*     mesh = m; */
-/*     s = sizes; */
-/*     PCU_ALWAYS_ASSERT(apf::getValueType(s)==apf::SCALAR); */
-/*     PCU_ALWAYS_ASSERT(apf::getShape(s)->isInterpolating()); */
-/*     PCU_ALWAYS_ASSERT(apf::getShape(s)->getOrder()<=3); */
-/*     valueType = apf::SCALAR; */
-/*   } */
-/*   void getTransform( */
-/*       apf::MeshElement*, */
-/*       Vector const&, */
-/*       Matrix& Q) */
-/*   { */
-/*     Q = Matrix(1.,0.,0., */
-/*                0.,1.,0., */
-/*                0.,0.,1.); */
-/*   } */
-/*   void interpolate( */
-/*       apf::MeshElement* parent, */
-/*       Vector const& xi, */
-/*       Entity* ent, int node) */
-/*   { */
-/*     PCU_ALWAYS_ASSERT_VERBOSE( */
-/*     	node < apf::getShape(s)->countNodesOn(mesh->getType(ent)), */
-/*     	"node out of range for the Fields!"); */
-/*     apf::Element* el = apf::createElement(s,parent); */
-/*     double h; */
-/*     if (valueType == apf::SCALAR) */
-/*       h = apf::getScalar(el,xi); */
-/*     else if (valueType == apf::VECTOR) { */
-/*       Vector v; */
-/*       apf::getVector(el, xi, v); */
-/*       h = v[0]; */
-/*     } */
-/*     else */
-/*       PCU_ALWAYS_ASSERT_VERBOSE(0, "unsupported value type!"); */
-/*     this->setValue(ent,node,h); */
-/*     apf::destroyElement(el); */
-/*   } */
-/*   void setValue( */
-/*       Entity* e, */
-/*       int node, */
-/*       double h) */
-/*   { */
-/*     if (valueType == apf::SCALAR) */
-/*       apf::setScalar(s,e,node,h); */
-/*     else if (valueType == apf::VECTOR) */
-/*       apf::setVector(s,e,node,Vector(h,h,h)); */
-/*     else */
-/*       PCU_ALWAYS_ASSERT_VERBOSE(0, "unsupported value type!"); */
-/*   } */
-
-/*   IsoWrapper wrapper; */
-/*   apf::Field* s; */
-/*   int valueType; */
-/* }; */
-
-/* class FieldReader : public IsotropicFunction */
-/* { */
-/*   public: */
-/*     FieldReader(apf::Field* f) */
-/*     { */
-/*       field = f; */
-/*       PCU_ALWAYS_ASSERT(apf::getValueType(field)==apf::SCALAR); */
-/*       PCU_ALWAYS_ASSERT(std::string(apf::getShape(field)->getName())== */
-/*       	    std::string("Lagrange")); */
-/*       PCU_ALWAYS_ASSERT(apf::getShape(field)->getOrder()<=3); */
-/*     } */
-/*     virtual ~FieldReader() {} */
-/*     virtual double getValue(const Vector& x) */
-/*     { */
-/*       /1* return apf::getScalar(field,vert,0); *1/ */
-/*       return x[0]; */
-/*     } */
-/*     apf::Field* field; */
-/* }; */
-
-/* struct IsoUserField : public IsoSizeField */
-/* { */
-/*   IsoUserField(Mesh* m, apf::Field* f): */
-/*     IsoSizeField(m, &reader), */
-/*     reader(f) */
-/*   { */
-/*   } */
-/*   FieldReader reader; */
-/* }; */
 
 SizeField* makeSizeField(Mesh* m, apf::Field* sizes, apf::Field* frames,
     bool logInterpolation)
