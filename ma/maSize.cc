@@ -211,25 +211,25 @@ IsotropicFunction::~IsotropicFunction()
 {
 }
 
-struct IsoWrapper : public AnisotropicFunction
-{
-  IsoWrapper()
-  {
-  }
-  IsoWrapper(IsotropicFunction* f)
-  {
-    function = f;
-  }
-  void getValue(const Vector& x, Matrix& r, Vector& h)
-  {
-    r = Matrix(1,0,0,
-               0,1,0,
-               0,0,1);
-    double s = function->getValue(x);
-    h = Vector(s,s,s);
-  }
-  IsotropicFunction* function;
-};
+/* struct IsoWrapper : public AnisotropicFunction */
+/* { */
+/*   IsoWrapper() */
+/*   { */
+/*   } */
+/*   IsoWrapper(IsotropicFunction* f) */
+/*   { */
+/*     function = f; */
+/*   } */
+/*   void getValue(const Vector& x, Matrix& r, Vector& h) */
+/*   { */
+/*     r = Matrix(1,0,0, */
+/*                0,1,0, */
+/*                0,0,1); */
+/*     double s = function->getValue(x); */
+/*     h = Vector(s,s,s); */
+/*   } */
+/*   IsotropicFunction* function; */
+/* }; */
 
 struct BothEval
 {
@@ -239,8 +239,9 @@ struct BothEval
   BothEval(AnisotropicFunction* f, Mesh* m) :
     function(f), mesh(m)
   {
-    // if shape of mesh is Lagrange and order is <= 3 use coordinateField
-    if (std::string(mesh->getShape()->getName()) == std::string("Lagrange") &&
+    // if shape of mesh is interpolating (i.e., Lagrange)
+    // and order is <= 3 use coordinateField
+    if (mesh->getShape()->isInterpolating() &&
 	mesh->getShape()->getOrder() <= 3) {
       useCoordinates = true;
       shape = mesh->getShape();
@@ -359,7 +360,7 @@ struct LogMEval : public apf::Function
     function(f), mesh(m)
   {
     // if shape of mesh is Lagrange and order is <= 3 use coordinateField
-    if (std::string(mesh->getShape()->getName()) == std::string("Lagrange") &&
+    if (mesh->getShape()->isInterpolating() &&
 	mesh->getShape()->getOrder() <= 3) {
       useCoordinates = true;
       shape = mesh->getShape();
@@ -435,6 +436,80 @@ struct LogMEval : public apf::Function
   apf::FieldShape* shape;
   apf::DynamicArray<Matrix> cachedLogMs;
 };
+
+struct IsoEval : public apf::Function
+{
+  IsoEval()
+  {
+  }
+  IsoEval(IsotropicFunction* f, Mesh* m) :
+    function(f), mesh(m)
+  {
+    // if shape of mesh is Lagrange and order is <= 3 use coordinateField
+    if (mesh->getShape()->isInterpolating() &&
+	mesh->getShape()->getOrder() <= 3) {
+      useCoordinates = true;
+      shape = mesh->getShape();
+    }
+    else {
+      useCoordinates = false;
+      int order = mesh->getShape()->getOrder();
+      order = order <= 3 ? order : 3;
+      shape = apf::getLagrange(order);
+    }
+    cachedEnt = 0;
+  }
+  void updateCache(Entity* e)
+  {
+    if (e == cachedEnt)
+      return;
+
+    int non = shape->countNodesOn(mesh->getType(e));
+    cachedSizes.setSize(non);
+    Vector coords; // physical coordinate of the node
+    if (useCoordinates)
+      for (int i = 0; i < non; i++) {
+	mesh->getPoint(e, i, coords);
+	cachedSizes[i] = function->getValue(coords);
+      }
+    else {
+      Vector xi;     // parent coordinate of the node
+      apf::MeshElement* me = apf::createMeshElement(mesh, e);
+      for (int i = 0; i < non; i++) {
+      	shape->getNodeXi(mesh->getType(e), i, xi);
+	apf::mapLocalToGlobal(me, xi, coords);
+	cachedSizes[i] = function->getValue(coords);
+      }
+      apf::destroyMeshElement(me);
+    }
+    cachedEnt = e;
+  }
+  void getSizeAtNode(Entity* e, int n, double& f)
+  {
+    updateCache(e);
+    f = cachedSizes[n];
+  }
+  void getAllSizes(Entity* e, apf::DynamicArray<double>& f)
+  {
+    updateCache(e);
+    f = cachedSizes;
+  }
+  void eval(Entity* e, double* result)
+  {
+    apf::DynamicArray<double> f;
+    getAllSizes(e, f);
+    for (std::size_t i = 0; i < f.getSize(); i++) {
+      result[i] = f[i];
+    }
+  }
+  IsotropicFunction* function;
+  Mesh* mesh;
+  bool useCoordinates;
+  Entity* cachedEnt;
+  apf::FieldShape* shape;
+  apf::DynamicArray<double> cachedSizes;
+};
+
 
 struct AnisoSizeField : public MetricSizeField
 {
@@ -614,24 +689,26 @@ struct LogAnisoSizeField : public MetricSizeField
   LogMEval logMEval;
 };
 
-struct IsoSizeField : public AnisoSizeField
+struct IsoSizeField : public MetricSizeField
 {
   IsoSizeField()
   {
   }
-  IsoSizeField(Mesh* m, IsotropicFunction* f):
-    AnisoSizeField(m, &wrapper),
-    wrapper(f)
+  IsoSizeField(Mesh* m, IsotropicFunction* f) :
+    isoEval(f, m)
   {
+    mesh = m;
+    sField = apf::createUserField(m, "ma_sizes", apf::SCALAR,
+    	apf::getLagrange(isoEval.shape->getOrder()), &isoEval);
+  }
+  ~IsoSizeField()
+  {
+    apf::destroyField(sField);
   }
   void init(Mesh* m, apf::Field* sizes)
   {
     mesh = m;
-    f = sizes;
-    PCU_ALWAYS_ASSERT(apf::getValueType(f)==apf::SCALAR);
-    PCU_ALWAYS_ASSERT(std::string(apf::getShape(f)->getName())==
-	  std::string("Lagrange"));
-    PCU_ALWAYS_ASSERT(apf::getShape(f)->getOrder()<=3);
+    sField = sizes;
   }
   void getTransform(
       apf::MeshElement*,
@@ -648,9 +725,9 @@ struct IsoSizeField : public AnisoSizeField
       Entity* ent, int node)
   {
     PCU_ALWAYS_ASSERT_VERBOSE(
-    	node < apf::getShape(f)->countNodesOn(mesh->getType(ent)),
+    	node < apf::getShape(sField)->countNodesOn(mesh->getType(ent)),
     	"node out of range for the Fields!");
-    apf::Element* el = apf::createElement(f,parent);
+    apf::Element* el = apf::createElement(sField,parent);
     double h = apf::getScalar(el,xi);
     this->setValue(ent,node,h);
     apf::destroyElement(el);
@@ -660,12 +737,85 @@ struct IsoSizeField : public AnisoSizeField
       int node,
       double h)
   {
-    apf::setScalar(f,e,node,h);
+    apf::setScalar(sField,e,node,h);
   }
-
-  IsoWrapper wrapper;
-  apf::Field* f;
+  IsoEval isoEval;
+  apf::Field* sField;
 };
+
+/* struct IsoSizeField : public AnisoSizeField */
+/* { */
+/*   IsoSizeField() */
+/*   { */
+/*   } */
+/*   IsoSizeField(Mesh* m, IsotropicFunction* f): */
+/*     AnisoSizeField(m, &wrapper), */
+/*     wrapper(f) */
+/*   { */
+/*     s = hField; // from the AnisoSizeField class */
+/*     valueType = apf::VECTOR; */
+/*   } */
+/*   ~IsoSizeField() */
+/*   { */
+/*     apf::destroyField(s); */
+/*   } */
+/*   void init(Mesh* m, apf::Field* sizes) */
+/*   { */
+/*     mesh = m; */
+/*     s = sizes; */
+/*     PCU_ALWAYS_ASSERT(apf::getValueType(s)==apf::SCALAR); */
+/*     PCU_ALWAYS_ASSERT(apf::getShape(s)->isInterpolating()); */
+/*     PCU_ALWAYS_ASSERT(apf::getShape(s)->getOrder()<=3); */
+/*     valueType = apf::SCALAR; */
+/*   } */
+/*   void getTransform( */
+/*       apf::MeshElement*, */
+/*       Vector const&, */
+/*       Matrix& Q) */
+/*   { */
+/*     Q = Matrix(1.,0.,0., */
+/*                0.,1.,0., */
+/*                0.,0.,1.); */
+/*   } */
+/*   void interpolate( */
+/*       apf::MeshElement* parent, */
+/*       Vector const& xi, */
+/*       Entity* ent, int node) */
+/*   { */
+/*     PCU_ALWAYS_ASSERT_VERBOSE( */
+/*     	node < apf::getShape(s)->countNodesOn(mesh->getType(ent)), */
+/*     	"node out of range for the Fields!"); */
+/*     apf::Element* el = apf::createElement(s,parent); */
+/*     double h; */
+/*     if (valueType == apf::SCALAR) */
+/*       h = apf::getScalar(el,xi); */
+/*     else if (valueType == apf::VECTOR) { */
+/*       Vector v; */
+/*       apf::getVector(el, xi, v); */
+/*       h = v[0]; */
+/*     } */
+/*     else */
+/*       PCU_ALWAYS_ASSERT_VERBOSE(0, "unsupported value type!"); */
+/*     this->setValue(ent,node,h); */
+/*     apf::destroyElement(el); */
+/*   } */
+/*   void setValue( */
+/*       Entity* e, */
+/*       int node, */
+/*       double h) */
+/*   { */
+/*     if (valueType == apf::SCALAR) */
+/*       apf::setScalar(s,e,node,h); */
+/*     else if (valueType == apf::VECTOR) */
+/*       apf::setVector(s,e,node,Vector(h,h,h)); */
+/*     else */
+/*       PCU_ALWAYS_ASSERT_VERBOSE(0, "unsupported value type!"); */
+/*   } */
+
+/*   IsoWrapper wrapper; */
+/*   apf::Field* s; */
+/*   int valueType; */
+/* }; */
 
 /* class FieldReader : public IsotropicFunction */
 /* { */
