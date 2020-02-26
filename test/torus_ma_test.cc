@@ -15,11 +15,10 @@ class CylindricalShock : public ma::AnisotropicFunction
       mesh = m;
       average = ma::getAverageEdgeLength(m);
     }
-    virtual void getValue(ma::Entity* v, ma::Matrix& R, ma::Vector& H)
+    virtual void getValue(const ma::Vector& p, ma::Matrix& R, ma::Vector& H)
     {
       double cntr = 1.0; // centroid radius for the torus example
       double l = 2.0; // decay factor -- for the torus example
-      ma::Vector p = ma::getPosition(mesh,v);
       double x = p[0];
       double y = p[1];
       double norm = std::sqrt(x*x + y*y);

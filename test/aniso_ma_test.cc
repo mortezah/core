@@ -18,9 +18,8 @@ class AnIso : public ma::AnisotropicFunction
       average = ma::getAverageEdgeLength(m);
       ma::getBoundingBox(m,lower,upper);
     }
-    virtual void getValue(ma::Entity* v, ma::Matrix& R, ma::Vector& H)
+    virtual void getValue(const ma::Vector& p, ma::Matrix& R, ma::Vector& H)
     {
-      ma::Vector p = ma::getPosition(mesh,v);
       double x = (p[0] - lower[0])/(upper[0] - lower[0]);
       double sizeFactor = 2.;
       if (x < 0.5)

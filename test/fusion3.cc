@@ -239,11 +239,10 @@ class Vortex : public ma::AnisotropicFunction
         centroid[i]=center[i];
     }
     virtual void getValue(
-        ma::Entity* v,
+        const ma::Vector& x,
         ma::Matrix& R,
         ma::Vector& h)
     {
-      ma::Vector x = ma::getPosition(mesh,v);
       double dx=x[0]-centroid[0];
       double dy=x[1]-centroid[1];
       double r=sqrt(dx*dx+dy*dy);

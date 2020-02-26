@@ -22,9 +22,8 @@ class Linear : public ma::IsotropicFunction
       average = ma::getAverageEdgeLength(m);
       ma::getBoundingBox(m,lower,upper);
     }
-    virtual double getValue(ma::Entity* v)
+    virtual double getValue(const ma::Vector& p)
     {
-      ma::Vector p = ma::getPosition(mesh,v);
       double x = (p[0] - lower[0])/(upper[0] - lower[0]);
       return average*(4*x+2)/3;
     }
