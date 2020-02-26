@@ -71,6 +71,7 @@ class Bezier : public apf::FieldShape
 {
 public:
   const char* getName() const {return name.c_str();}
+  bool isInterpolating() const {return false;}
   Bezier() {
     std::stringstream ss;
     ss << "Bezier";
@@ -285,6 +286,7 @@ class GregorySurface4 : public apf::FieldShape
 {
 public:
   const char* getName() const {return name.c_str();}
+  bool isInterpolating() const {return false;}
   GregorySurface4() {
     std::stringstream ss;
     ss << "GregorySurface";

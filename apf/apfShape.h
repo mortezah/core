@@ -96,6 +96,9 @@ class FieldShape
     virtual void getNodeXi(int type, int node, Vector3& xi);
 /** \brief Get a unique string for this shape function scheme */
     virtual const char* getName() const = 0;
+/** \brief Return true if shape is interpolating
+  \details true only for Lagrange shapes*/
+    virtual bool isInterpolating() const = 0;
     void registerSelf(const char* name);
 };
 

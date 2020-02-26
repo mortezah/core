@@ -42,6 +42,7 @@ class IPBase : public FieldShape
         return 0; //some types have no integrations of this order
       return i->countPoints();
     }
+    bool isInterpolating() const {return false;}
     /* this field can integrate a polynomial of
        this order exactly */
     int getOrder() {return order;}

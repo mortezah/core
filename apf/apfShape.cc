@@ -73,6 +73,7 @@ class Linear : public FieldShape
   public:
     Linear() { registerSelf(apf::Linear::getName()); }
     const char* getName() const { return "Linear"; }
+    bool isInterpolating() const {return true; }
     class Vertex : public EntityShape
     {
       public:
@@ -356,6 +357,7 @@ class Linear : public FieldShape
 class QuadraticBase : public FieldShape
 {
   public:
+    bool isInterpolating() const {return true; }
     class Edge : public EntityShape
     {
       public:
@@ -648,6 +650,7 @@ class LagrangeCubic : public FieldShape
   public:
     LagrangeCubic() { registerSelf(apf::LagrangeCubic::getName()); }
     const char* getName() const { return "Lagrange Cubic"; }
+    bool isInterpolating() const {return true; }
     class Vertex : public EntityShape
     {
       public:
@@ -918,6 +921,7 @@ class Constant : public FieldShape
     {
       return name.c_str();
     }
+    bool isInterpolating() const {return false;}
     class Element : public EntityShape
     {
       public:

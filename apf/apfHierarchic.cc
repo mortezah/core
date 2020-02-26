@@ -253,6 +253,7 @@ class HTetrahedron2 : public EntityShape {
 class Hierarchic2 : public FieldShape {
   public:
     const char* getName() const { return "Hierarchic2"; }
+    bool isInterpolating() const { return false; }
     EntityShape* getEntityShape(int type) {
       static HVertex vtx;
       static HEdge2 edge;
@@ -292,6 +293,7 @@ class Hierarchic3 : public FieldShape
   public:
     Hierarchic3() {}
     const char* getName() const { return "Hierarchic3"; }
+    bool isInterpolating() const { return false; }
     EntityShape* getEntityShape(int type)
     {
       static HVertex vertex;
