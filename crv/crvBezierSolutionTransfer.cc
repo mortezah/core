@@ -148,7 +148,6 @@ class CrvBezierSolutionTransfer : public ma::SolutionTransfer
         ma::Entity* parent,
         ma::EntityArray& newEntities)
     {
-      std::cout<<" Inside On Redine of crvSolutionTransfer"<<std::endl;
       int P = shape->getOrder();
       int parentType = mesh->getType(parent);
       apf::Downward parentVerts, parentEdges;
@@ -174,7 +173,6 @@ class CrvBezierSolutionTransfer : public ma::SolutionTransfer
           midEdgeVerts[i] = 0;
       }
 
-      std::cout<<" Inside On Refine -- done new nodes due refine "<<std::endl;
       int np = shape->getEntityShape(parentType)->countNodes();
 
       apf::Element* elem = apf::createElement(f, parent);
